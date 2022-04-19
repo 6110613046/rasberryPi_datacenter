@@ -20,23 +20,15 @@ app = Flask(__name__)
 
 line_bot_api = LineBotApi(channel_access_token)
 handler = WebhookHandler(channel_secret)
+
+count_unknown = 0
 #Initialize 'currentname' to trigger only when a new person is identified.
-currentname = "unknown"
+currentname = "Unknown"
 #Determine faces from encodings.pickle file model created from train_model.py
 encodingsP = "encodings.pickle"
 #use this xml file
 cascade = "haarcascade_frontalface_default.xml"
 
-#function for setting up emails
-def send_message(name):
-    return requests.post(
-        "https://api.mailgun.net/v3/YOUR_DOMAIN_NAME/messages",
-        auth=("api", "YOUR_API_KEY"),
-        files = [("attachment", ("image.jpg", open("image.jpg", "rb").read()))],
-        data={"from": 'hello@example.com',
-            "to": ["YOUR_MAILGUN_EMAIL_ADDRESS"],
-            "subject": "You have a visitor",
-            "html": "<html>" + name + " is at your door.  </html>"})
 
 # load the known faces and embeddings along with OpenCV's Haar
 # cascade for face detection
@@ -55,6 +47,7 @@ fps = FPS().start()
 
 # loop over frames from the video file stream
 while True:
+
 	# grab the frame from the threaded video stream and resize it
 	# to 500px (to speedup processing)
 	frame = vs.read()
@@ -78,6 +71,7 @@ while True:
 	# compute the facial embeddings for each face bounding box
 	encodings = face_recognition.face_encodings(rgb, boxes)
 	names = []
+	print('Taking a picture.1')
 
 	# loop over the facial embeddings
 	for encoding in encodings:
@@ -106,7 +100,7 @@ while True:
 			# will select first entry in the dictionary)
 
 			name = max(counts, key=counts.get)
-			
+			print('Taking a picture.2')
 			#If someone in your dataset is identified, print their name on the screen
 			if currentname != name:
 				currentname = name
@@ -114,18 +108,23 @@ while True:
 				#Take a picture to send in the email
 				img_name = "image.jpg"
 				cv2.imwrite(img_name, frame)
-				print('Taking a picture.')
+				print('Taking a picture.3')
 
 				line_bot_api.push_message(
-					
             		'U431d1d22b3a0fa2e739420edc7917345',
             		TextSendMessage(text=currentname)
             		)
-				
-				#Now send me an email to let me know who is at the door
-				request = send_message(name)
-				print ('Status Code: '+format(request.status_code)) #200 status code means email sent successfully
-				
+				count_unknown = 0
+
+		else :
+			count_unknown += 1
+			if count_unknown > 5:
+				line_bot_api.push_message(
+					'U431d1d22b3a0fa2e739420edc7917345',
+            		TextSendMessage(text='มีคนที่ไม่ระบุตัวตนเข้ามา')
+            		)
+				count_unknown = 0
+
 		# update the list of names
 		names.append(name)
 
